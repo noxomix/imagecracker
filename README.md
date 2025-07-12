@@ -74,68 +74,11 @@ imagecracker setup
 
 ## Requirements
 
-- Dockerfile in target directory
+- Dockerfile in target directory (see [Firecracker-Compatible Dockerfile Examples](#firecracker-compatible-dockerfile-examples) below)
 - Docker installed and running
 - Root/sudo access for image operations
 
-## Firecracker-Compatible Dockerfile
-
-For Firecracker VMs, your Dockerfile needs an init system since Firecracker runs full VMs (not containers). Here's a working example:
-
-```dockerfile
-FROM ubuntu:20.04
-
-# Avoid interactive prompts
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Install systemd and essential packages
-RUN apt-get update && apt-get install -y \
-    systemd \
-    systemd-sysv \
-    init \
-    openssh-server \
-    curl \
-    net-tools \
-    iproute2 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# Configure systemd
-RUN systemctl set-default multi-user.target
-
-# Disable unnecessary services for faster boot
-RUN systemctl mask \
-    systemd-random-seed.service \
-    cryptsetup.target \
-    getty@tty1.service
-
-# Set hostname
-RUN echo 'firecracker-vm' > /etc/hostname
-
-# Configure SSH (optional)
-RUN mkdir -p /var/run/sshd && \
-    echo 'root:firecracker' | chpasswd
-
-# Use systemd as PID 1
-ENTRYPOINT ["/sbin/init"]
-```
-
-### Key Differences from Regular Docker Images:
-- **Init System Required**: Firecracker VMs need systemd, OpenRC, or custom init
-- **PID 1**: Must use `/sbin/init` as entrypoint, not your application
-- **Full VM Environment**: Include networking tools, SSH server, etc.
-- **Hostname Configuration**: Set hostname for the VM
-
-### Minimal Alternative (Alpine Linux):
-```dockerfile
-FROM alpine:latest
-
-RUN apk add --no-cache openrc util-linux openssh bash && \
-    rc-update add sshd default && \
-    echo 'root:alpine' | chpasswd
-
-ENTRYPOINT ["/sbin/init"]
-```
+**Important**: Firecracker VMs require special Dockerfile configurations with init systems (systemd/OpenRC) since they run full VMs, not containers. Your Dockerfile must use `/sbin/init` as entrypoint and include essential system packages.
 
 ## Output Structure
 
@@ -177,3 +120,63 @@ $HOME/firecracker_images/
 This project is licensed under the Apache License 2.0 - see the [LICENSE.md](LICENSE.md) file for details.
 
 The included Linux kernel (`vmlinux`) is licensed under GPLv2 - see [KERNEL_LICENSE.md](KERNEL_LICENSE.md) for details.
+
+## Firecracker-Compatible Dockerfile Examples
+
+For Firecracker VMs, your Dockerfile needs an init system since Firecracker runs full VMs (not containers). Here are working examples:
+
+### Ubuntu with systemd
+```dockerfile
+FROM ubuntu:20.04
+
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install systemd and essential packages
+RUN apt-get update && apt-get install -y \
+    systemd \
+    systemd-sysv \
+    init \
+    openssh-server \
+    curl \
+    net-tools \
+    iproute2 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure systemd
+RUN systemctl set-default multi-user.target
+
+# Disable unnecessary services for faster boot
+RUN systemctl mask \
+    systemd-random-seed.service \
+    cryptsetup.target \
+    getty@tty1.service
+
+# Set hostname
+RUN echo 'firecracker-vm' > /etc/hostname
+
+# Configure SSH (optional)
+RUN mkdir -p /var/run/sshd && \
+    echo 'root:firecracker' | chpasswd
+
+# Use systemd as PID 1
+ENTRYPOINT ["/sbin/init"]
+```
+
+### Alpine Linux with OpenRC (Minimal)
+```dockerfile
+FROM alpine:latest
+
+RUN apk add --no-cache openrc util-linux openssh bash && \
+    rc-update add sshd default && \
+    echo 'root:alpine' | chpasswd
+
+ENTRYPOINT ["/sbin/init"]
+```
+
+### Key Differences from Regular Docker Images:
+- **Init System Required**: Firecracker VMs need systemd, OpenRC, or custom init
+- **PID 1**: Must use `/sbin/init` as entrypoint, not your application
+- **Full VM Environment**: Include networking tools, SSH server, etc.
+- **Hostname Configuration**: Set hostname for the VM
