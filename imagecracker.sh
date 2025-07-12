@@ -15,7 +15,7 @@ DEFAULT_SIZE="2048"
 IMAGE_NAME=""
 OUTPUT_DIR="$DEFAULT_OUTPUT_DIR"
 KERNEL_PATH="$DEFAULT_KERNEL"
-COMPRESS=false
+COMPRESS=true
 SIZE="$DEFAULT_SIZE"
 WORKING_DIR="."
 
@@ -36,21 +36,24 @@ show_usage() {
 ImageCracker - Universal Firecracker Image Builder
 
 USAGE:
-    $(basename "$0") [OPTIONS] [DIRECTORY]
+    $(basename "$0") <COMMAND> [OPTIONS] [DIRECTORY]
 
-OPTIONS:
-    -n NAME         Image name (required)
-    -d DIRECTORY    Output directory (default: $DEFAULT_OUTPUT_DIR)
-    -k KERNEL       Path to kernel/vmlinux (default: bundled vmlinux)
-    -c              Optimize rootfs size (shrink to actual usage)
-    -s SIZE         Initial rootfs size in MB (default: $DEFAULT_SIZE)
-    -symlink        Install symlink for global access
-    -h, --help      Show this help message
+COMMANDS:
+    build           Build Firecracker image from Dockerfile
+    setup           Install symlink for global access
+
+BUILD OPTIONS:
+    -n, --name NAME         Image name (required)
+    -d, --directory DIR     Output directory (default: $DEFAULT_OUTPUT_DIR)
+    -k, --kernel KERNEL     Path to kernel/vmlinux (default: bundled vmlinux)
+    --no-compact            Disable rootfs optimization (keep full size)
+    -s, --size SIZE         Initial rootfs size in MB (default: $DEFAULT_SIZE)
+    -h, --help              Show this help message
 
 EXAMPLES:
-    $(basename "$0") -n myapp .                    # Build image from current directory
-    $(basename "$0") -n prod -c /path/to/project   # Build optimized production image
-    $(basename "$0") -symlink                      # Install for global access
+    $(basename "$0") build --name myapp .                     # Build image from current directory
+    $(basename "$0") build -n prod /path/to/project          # Build optimized production image
+    $(basename "$0") setup                                    # Install for global access
 
 REQUIREMENTS:
     - Dockerfile in target directory
@@ -77,6 +80,10 @@ install_symlink() {
         shell_rc="$HOME/.bashrc"
     fi
     
+    # Create default firecracker_images directory
+    print_info "Creating default output directory: $DEFAULT_OUTPUT_DIR"
+    mkdir -p "$DEFAULT_OUTPUT_DIR"
+    
     # Create bin directory if it doesn't exist
     mkdir -p "$bin_dir"
     
@@ -98,6 +105,7 @@ install_symlink() {
         print_info "Added $bin_dir to PATH in $shell_rc"
     fi
     
+    print_info "Default output directory created: $DEFAULT_OUTPUT_DIR"
     print_info "Symlink installed: $symlink_path"
     print_info "You can now use 'imagecracker' from anywhere"
     print_info "Restart your shell or run: source $shell_rc"
@@ -134,6 +142,35 @@ validate_requirements() {
 
 # Parse command line arguments
 parse_args() {
+    if [[ $# -eq 0 ]]; then
+        show_usage
+        exit 1
+    fi
+    
+    local command="$1"
+    shift
+    
+    case "$command" in
+        build)
+            parse_build_args "$@"
+            ;;
+        setup)
+            install_symlink
+            ;;
+        -h|--help)
+            show_usage
+            exit 0
+            ;;
+        *)
+            print_error "Unknown command: $command"
+            show_usage
+            exit 1
+            ;;
+    esac
+}
+
+# Parse build command arguments
+parse_build_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             -n|--name)
@@ -148,16 +185,13 @@ parse_args() {
                 KERNEL_PATH="$2"
                 shift 2
                 ;;
-            -c|--compress)
-                COMPRESS=true
+            --no-compact)
+                COMPRESS=false
                 shift
                 ;;
             -s|--size)
                 SIZE="$2"
                 shift 2
-                ;;
-            -symlink)
-                install_symlink
                 ;;
             -h|--help)
                 show_usage
@@ -177,7 +211,7 @@ parse_args() {
     
     # Validate required arguments
     if [[ -z "$IMAGE_NAME" ]]; then
-        print_error "Image name is required (-n NAME)"
+        print_error "Image name is required (--name NAME)"
         show_usage
         exit 1
     fi
@@ -267,6 +301,7 @@ build_image() {
         print_info "Optimized: Yes"
     else
         print_info "Final size: ${final_size_mb}MB"
+        print_info "Optimized: No (full size)"
     fi
 }
 

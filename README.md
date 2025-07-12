@@ -5,7 +5,7 @@ Ein universelles CLI-Tool zum Erstellen von Firecracker VM-Images aus beliebigen
 ## Features
 
 - 🔧 **Universell**: Funktioniert in jedem Verzeichnis mit einer Dockerfile
-- 📦 **Automatische Optimierung**: Komprimiert Images auf minimale Größe
+- 📦 **Automatische Optimierung**: Verkleinert Images standardmäßig auf tatsächlich benötigte Größe
 - 🎯 **Flexibel**: Anpassbare Parameter für verschiedene Use Cases
 - 🔗 **Global verfügbar**: Symlink-Installation für systemweiten Zugriff
 - 🏠 **Benutzer-spezifisch**: Images werden im User-Home-Verzeichnis gespeichert
@@ -15,7 +15,7 @@ Ein universelles CLI-Tool zum Erstellen von Firecracker VM-Images aus beliebigen
 ### Symlink für globalen Zugriff installieren
 ```bash
 cd ~/imagecracker
-./imagecracker.sh -symlink
+./imagecracker.sh setup
 ```
 
 Nach der Installation können Sie `imagecracker` von überall verwenden!
@@ -24,38 +24,51 @@ Nach der Installation können Sie `imagecracker` von überall verwenden!
 
 ### Basis-Syntax
 ```bash
-imagecracker [OPTIONS] [DIRECTORY]
+imagecracker <COMMAND> [OPTIONS] [DIRECTORY]
 ```
 
-### Verfügbare Optionen
-- `-n NAME` - Image-Name (erforderlich)
-- `-d DIRECTORY` - Ausgabe-Verzeichnis (Standard: `$HOME/firecracker_images`)
-- `-k KERNEL` - Pfad zu vmlinux Kernel (Standard: mitgelieferter Kernel)
-- `-c` - RootFS komprimieren
-- `-s SIZE` - Initiale RootFS-Größe in MB (Standard: 2048)
-- `-symlink` - Symlink für globalen Zugriff installieren
+### Verfügbare Commands
+- `build` - Erstellt ein Firecracker Image aus einer Dockerfile
+- `setup` - Installiert Symlink für globalen Zugriff
+
+### Build-Optionen
+- `-n, --name NAME` - Image-Name (erforderlich)
+- `-d, --directory DIR` - Ausgabe-Verzeichnis (Standard: `$HOME/firecracker_images`)
+- `-k, --kernel KERNEL` - Pfad zu vmlinux Kernel (Standard: mitgelieferter Kernel)
+- `--no-compact` - Optimierung deaktivieren (volle Größe beibehalten)
+- `-s, --size SIZE` - Initiale RootFS-Größe in MB (Standard: 2048)
 - `-h, --help` - Hilfe anzeigen
 
 ### Beispiele
 
 #### Einfacher Build im aktuellen Verzeichnis
 ```bash
-imagecracker -n myapp .
+imagecracker build --name myapp .
 ```
 
-#### Komprimiertes Produktions-Image
+#### Produktions-Image (automatisch optimiert)
 ```bash
-imagecracker -n production -c /path/to/project
+imagecracker build --name production /path/to/project
+```
+
+#### Image ohne Optimierung (volle Größe)
+```bash
+imagecracker build --name fullsize --no-compact /path/to/project
 ```
 
 #### Mit eigenem Kernel und größerem Image
 ```bash
-imagecracker -n bigapp -k /path/to/vmlinux -s 4096 .
+imagecracker build --name bigapp --kernel /path/to/vmlinux --size 4096 .
 ```
 
 #### In eigenes Verzeichnis speichern
 ```bash
-imagecracker -n testapp -d /tmp/my-images .
+imagecracker build --name testapp --directory /tmp/my-images .
+```
+
+#### Setup für globalen Zugriff
+```bash
+imagecracker setup
 ```
 
 ## Anforderungen
@@ -83,7 +96,7 @@ $HOME/firecracker_images/
 ## Workflow
 
 1. **Vorbereitung**: Wechseln Sie in ein Verzeichnis mit einer Dockerfile
-2. **Build**: Führen Sie `imagecracker -n <name> .` aus
+2. **Build**: Führen Sie `imagecracker build --name <name> .` aus
 3. **Verwendung**: Die fertigen Images befinden sich in `$HOME/firecracker_images/<name>/`
 
 ## Mitgelieferte Dateien
@@ -95,6 +108,7 @@ $HOME/firecracker_images/
 ## Tipps
 
 - Verwenden Sie sprechende Namen für Ihre Images (`-n dev`, `-n prod`, etc.)
-- Nutzen Sie Kompression (`-c`) für kleinere Image-Dateien
+- Images werden standardmäßig optimiert (auf tatsächliche Größe verkleinert)
+- Verwenden Sie `--no-compact` nur wenn Sie die volle Größe benötigen
 - Der mitgelieferte Kernel funktioniert mit den meisten Anwendungen
 - Images werden automatisch überschrieben wenn Sie den gleichen Namen verwenden
