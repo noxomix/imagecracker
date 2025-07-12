@@ -1,92 +1,92 @@
 # ImageCracker - Universal Firecracker Image Builder
 
-Ein universelles CLI-Tool zum Erstellen von Firecracker VM-Images aus beliebigen Verzeichnissen mit Dockerfiles.
+A universal CLI tool for creating Firecracker VM images from any directory with a Dockerfile.
 
 ## Features
 
-- 🔧 **Universell**: Funktioniert in jedem Verzeichnis mit einer Dockerfile
-- 📦 **Automatische Optimierung**: Verkleinert Images standardmäßig auf tatsächlich benötigte Größe
-- 🎯 **Flexibel**: Anpassbare Parameter für verschiedene Use Cases
-- 🔗 **Global verfügbar**: Symlink-Installation für systemweiten Zugriff
-- 🏠 **Benutzer-spezifisch**: Images werden im User-Home-Verzeichnis gespeichert
+- 🔧 **Universal**: Works with any directory containing a Dockerfile
+- 📦 **Automatic Optimization**: Shrinks images to actual required size by default
+- 🎯 **Flexible**: Customizable parameters for different use cases
+- 🔗 **Globally Available**: Symlink installation for system-wide access
+- 🏠 **User-specific**: Images are stored in the user's home directory
 
 ## Installation
 
-### Symlink für globalen Zugriff installieren
+### Install symlink for global access
 ```bash
-cd ~/imagecracker
+git clone https://github.com/noxomix/imagecracker.git
+cd imagecracker
 ./imagecracker.sh setup
 ```
 
-Nach der Installation können Sie `imagecracker` von überall verwenden!
+After installation, you can use `imagecracker` from anywhere!
 
-## Verwendung
+## Usage
 
-### Basis-Syntax
+### Basic Syntax
 ```bash
 imagecracker <COMMAND> [OPTIONS] [DIRECTORY]
 ```
 
-### Verfügbare Commands
-- `build` - Erstellt ein Firecracker Image aus einer Dockerfile
-- `setup` - Installiert Symlink für globalen Zugriff
+### Available Commands
+- `build` - Creates a Firecracker image from a Dockerfile
+- `setup` - Installs symlink for global access
 
-### Build-Optionen
-- `-n, --name NAME` - Image-Name (erforderlich)
-- `-d, --directory DIR` - Ausgabe-Verzeichnis (Standard: `$HOME/firecracker_images`)
-- `-k, --kernel KERNEL` - Pfad zu vmlinux Kernel (Standard: mitgelieferter Kernel)
-- `--no-compact` - Optimierung deaktivieren (volle Größe beibehalten)
-- `-s, --size SIZE` - Initiale RootFS-Größe in MB (Standard: 2048)
-- `-h, --help` - Hilfe anzeigen
+### Build Options
+- `-n, --name NAME` - Image name (required)
+- `-d, --directory DIR` - Output directory (default: `$HOME/firecracker_images`)
+- `-k, --kernel KERNEL` - Path to vmlinux kernel (default: bundled kernel)
+- `--no-compact` - Disable rootfs optimization (keep full size)
+- `-s, --size SIZE` - Initial rootfs size in MB (default: 2048)
+- `-h, --help` - Show help message
 
-### Beispiele
+### Examples
 
-#### Einfacher Build im aktuellen Verzeichnis
+#### Simple build in current directory
 ```bash
 imagecracker build --name myapp .
 ```
 
-#### Produktions-Image (automatisch optimiert)
+#### Production image (automatically optimized)
 ```bash
 imagecracker build --name production /path/to/project
 ```
 
-#### Image ohne Optimierung (volle Größe)
+#### Image without optimization (full size)
 ```bash
 imagecracker build --name fullsize --no-compact /path/to/project
 ```
 
-#### Mit eigenem Kernel und größerem Image
+#### With custom kernel and larger image
 ```bash
 imagecracker build --name bigapp --kernel /path/to/vmlinux --size 4096 .
 ```
 
-#### In eigenes Verzeichnis speichern
+#### Save to custom directory
 ```bash
 imagecracker build --name testapp --directory /tmp/my-images .
 ```
 
-#### Setup für globalen Zugriff
+#### Setup for global access
 ```bash
 imagecracker setup
 ```
 
-## Anforderungen
+## Requirements
 
-- Dockerfile im Zielverzeichnis
-- Docker installiert und laufend
-- Root/sudo-Zugriff für Image-Operationen
-- Standard Linux-Tools: `dd`, `mkfs.ext4`, `e2fsck`, `resize2fs`, etc.
+- Dockerfile in target directory
+- Docker installed and running
+- Root/sudo access for image operations
 
-## Ausgabe-Struktur
+## Output Structure
 
-Images werden strukturiert gespeichert:
+Images are stored in a structured format:
 
 ```
 $HOME/firecracker_images/
 ├── myapp/
-│   ├── vmlinux        # Kernel für diese VM
-│   └── rootfs.ext4    # Root-Dateisystem
+│   ├── vmlinux        # Kernel for this VM
+│   └── rootfs.ext4    # Root filesystem
 ├── production/
 │   ├── vmlinux
 │   └── rootfs.ext4
@@ -95,20 +95,26 @@ $HOME/firecracker_images/
 
 ## Workflow
 
-1. **Vorbereitung**: Wechseln Sie in ein Verzeichnis mit einer Dockerfile
-2. **Build**: Führen Sie `imagecracker build --name <name> .` aus
-3. **Verwendung**: Die fertigen Images befinden sich in `$HOME/firecracker_images/<name>/`
+1. **Preparation**: Navigate to a directory with a Dockerfile
+2. **Build**: Run `imagecracker build --name <name> .`
+3. **Usage**: The finished images are located in `$HOME/firecracker_images/<name>/`
 
-## Mitgelieferte Dateien
+## Included Files
 
-- `imagecracker.sh` - Das Hauptskript
-- `vmlinux` - Standard Linux-Kernel für Firecracker VMs
-- `README.md` - Diese Dokumentation
+- `imagecracker.sh` - The main script
+- `vmlinux` - Standard Linux kernel for Firecracker VMs
+- `README.md` - This documentation
 
-## Tipps
+## Tips
 
-- Verwenden Sie sprechende Namen für Ihre Images (`-n dev`, `-n prod`, etc.)
-- Images werden standardmäßig optimiert (auf tatsächliche Größe verkleinert)
-- Verwenden Sie `--no-compact` nur wenn Sie die volle Größe benötigen
-- Der mitgelieferte Kernel funktioniert mit den meisten Anwendungen
-- Images werden automatisch überschrieben wenn Sie den gleichen Namen verwenden
+- Use descriptive names for your images (`--name dev`, `--name prod`, etc.)
+- Images are automatically optimized (shrunk to actual size) by default
+- Use `--no-compact` only if you need the full size
+- The included kernel works with most applications
+- Images are automatically overwritten if you use the same name
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE.md](LICENSE.md) file for details.
+
+The included Linux kernel (`vmlinux`) is licensed under GPLv2 - see [KERNEL_LICENSE.md](KERNEL_LICENSE.md) for details.
