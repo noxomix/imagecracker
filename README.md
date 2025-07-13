@@ -9,6 +9,8 @@ A universal CLI tool for creating Firecracker VM images from any directory with 
 - **Flexible**: Customizable parameters for different use cases
 - **Globally Available**: Symlink installation for system-wide access
 - **User-specific**: Images are stored in the user's home directory
+- **Interactive**: Direct console access to VMs
+- **Kernel Flexibility**: Support for custom kernel names and preservation
 
 ## Installation
 
@@ -31,13 +33,13 @@ imagecracker <COMMAND> [OPTIONS] [DIRECTORY]
 ### Available Commands
 - `build` - Creates a Firecracker image from a Dockerfile
 - `run` - Runs/tests a Firecracker image
-- `kill` - Kills running Firecracker VMs
 - `setup` - Installs symlink for global access
 
 ### Build Options
 - `-n, --name NAME` - Image name (required)
 - `-d, --directory DIR` - Output directory (default: `$HOME/firecracker_images`)
 - `-k, --kernel KERNEL` - Path to vmlinux kernel (default: bundled kernel)
+- `--keep-kernel-name` - Keep original kernel filename (default: rename to 'kernel')
 - `--no-compact` - Disable rootfs optimization (keep full size)
 - `-s, --size SIZE` - Initial rootfs size in MB (default: 2048)
 - `-h, --help` - Show help message
@@ -45,14 +47,11 @@ imagecracker <COMMAND> [OPTIONS] [DIRECTORY]
 ### Run Options
 - `-d, --directory DIR` - Image directory (default: `$HOME/firecracker_images`)
 - `-c, --config FILE` - Use custom Firecracker config file (won't be deleted)
+- `--kernel-name NAME` - Kernel filename in image directory (default: 'kernel')
 - `--ram SIZE` - RAM size in MB (default: 256, ignored with custom config)
 - `--vcpus COUNT` - Number of vCPUs (default: 2, ignored with custom config)
 - `--boot-args ARGS` - Kernel boot arguments (default: "console=ttyS0 reboot=k panic=1 pci=off", ignored with custom config)
 - `--executable PATH` - Path to firecracker executable (default: firecracker)
-- `-h, --help` - Show help message
-
-### Kill Options
-- `-a, --all` - Kill all running Firecracker VMs
 - `-h, --help` - Show help message
 
 ### Examples
@@ -77,6 +76,12 @@ imagecracker build --name fullsize --no-compact /path/to/project
 ##### With custom kernel and larger image
 ```bash
 imagecracker build --name bigapp --kernel /path/to/vmlinux --size 4096 .
+```
+
+##### Keep original kernel filename
+```bash
+imagecracker build --name myapp --kernel /path/to/mykernel-5.10 --keep-kernel-name .
+# This will save the kernel as 'mykernel-5.10' instead of 'kernel'
 ```
 
 ##### Save to custom directory
@@ -116,23 +121,15 @@ imagecracker run --executable /usr/local/bin/firecracker myapp
 imagecracker run -c /path/to/config.json myapp
 ```
 
+##### Run with custom kernel name
+```bash
+imagecracker run --kernel-name mykernel-5.10 myapp
+# Use this if the image was built with --keep-kernel-name
+```
+
 ##### Advanced configuration (all options)
 ```bash
 imagecracker run --ram 1024 --vcpus 8 --boot-args "console=ttyS0 debug" --executable /custom/firecracker myapp
-```
-
-#### Kill Examples
-
-##### Kill a specific VM
-```bash
-imagecracker kill myapp
-```
-
-##### Kill all running VMs
-```bash
-imagecracker kill --all
-# or
-imagecracker kill -a
 ```
 
 #### Setup for global access
@@ -151,7 +148,7 @@ imagecracker setup
 - Firecracker installed and in PATH (or custom path specified with `--executable`)
 - Root/sudo access for VM operations
 - Pre-built Firecracker images (created with the `build` command)
-- Screen installed (for background VM execution)
+- Screen installed (for VM console management)
 
 **Important**: Firecracker VMs require special Dockerfile configurations with init systems (systemd/OpenRC) since they run full VMs, not containers. Your Dockerfile must use `/sbin/init` as entrypoint and include essential system packages.
 
@@ -162,13 +159,18 @@ Images are stored in a structured format:
 ```
 $HOME/firecracker_images/
 ├── myapp/
-│   ├── vmlinux        # Kernel for this VM
+│   ├── kernel         # Kernel for this VM (default name)
 │   └── rootfs.ext4    # Root filesystem
 ├── production/
-│   ├── vmlinux
+│   ├── kernel
+│   └── rootfs.ext4
+├── custom-app/        # Built with --keep-kernel-name
+│   ├── mykernel-5.10  # Original kernel name preserved
 │   └── rootfs.ext4
 └── ...
 ```
+
+**Note**: By default, all kernels are saved as `kernel` for consistency. Use `--keep-kernel-name` during build to preserve the original kernel filename.
 
 ## Workflow
 
@@ -178,36 +180,30 @@ $HOME/firecracker_images/
 3. **Storage**: The finished images are located in `$HOME/firecracker_images/<name>/`
 
 ### Running Images
-1. **Test**: Run `imagecracker run <name>` to start the VM in a screen session
+1. **Test**: Run `imagecracker run <name>` to start and connect to the VM
 2. **Interact**: Use the console:
-   - Press Ctrl+A then D to detach from screen (VM keeps running)
-   - Run `screen -r firecracker-<name>` to reattach
-   - Press Ctrl+A then X to kill the VM (while attached)
+   - Press Ctrl+A then D to exit and terminate the VM
+   - Press Ctrl+A then X to kill the VM immediately
 3. **Configure**: Use options like `--ram`, `--vcpus`, `--boot-args` for customization
-4. **Kill**: Use `imagecracker kill <name>` to terminate a running VM
 
 ### Complete Example
 ```bash
-# Build an image
+# Build an image with default kernel naming
 imagecracker build --name webserver .
 
 # Run with default settings (256MB RAM, 2 vCPUs)
 imagecracker run webserver
 
-# Detach from the VM (Ctrl+A then D)
-# The VM continues running in the background
-
-# Reattach to the VM
-screen -r firecracker-webserver
-
-# Kill the VM from outside
-imagecracker kill webserver
+# Exit and terminate the VM (Ctrl+A then D)
 
 # Run with more resources
 imagecracker run --ram 512 --vcpus 4 webserver
 
-# Kill all running VMs
-imagecracker kill --all
+# Build with custom kernel and preserve its name
+imagecracker build --name custom-app --kernel mykernel-5.10 --keep-kernel-name .
+
+# Run the image with custom kernel name
+imagecracker run --kernel-name mykernel-5.10 custom-app
 ```
 
 ## Included Files
@@ -224,18 +220,48 @@ imagecracker kill --all
 - Use `--no-compact` only if you need the full size
 - The included kernel works with most applications
 - Images are automatically overwritten if you use the same name
+- Kernels are saved as 'kernel' by default for compatibility
+- Use `--keep-kernel-name` to preserve original kernel filenames
 
 ### Running
 - Start with default settings (256MB RAM, 2 vCPUs) and increase as needed
 - Use wildcard matching: `imagecracker run web` matches any image containing "web"
 - Custom configs override all other options (`--ram`, `--vcpus`, `--boot-args`)
-- VMs run in screen sessions for background execution
-- Screen controls:
-  - Ctrl+A then D: Detach (VM keeps running)
-  - Ctrl+A then X: Kill VM (while attached)
-  - `screen -r firecracker-<name>`: Reattach to VM
+- VM controls:
+  - Ctrl+A then D: Exit and terminate VM
+  - Ctrl+A then X: Kill VM immediately
 - Use `--boot-args "console=ttyS0 init=/bin/bash"` for debugging boot issues
-- Kill running VMs with `imagecracker kill <name>` or `imagecracker kill --all`
+- Default kernel filename is 'kernel', use `--kernel-name` if different
+
+## Kernel Naming Convention
+
+ImageCracker provides flexible kernel naming to support different use cases:
+
+### Default Behavior
+- All kernels are saved as `kernel` in the image directory
+- This ensures compatibility and consistency across images
+- The `run` command expects `kernel` by default
+
+### Custom Kernel Names
+If you need to preserve original kernel filenames (e.g., for version tracking):
+
+1. **During Build**: Use `--keep-kernel-name` flag
+   ```bash
+   imagecracker build --name myapp --kernel linux-5.10-custom --keep-kernel-name .
+   # Kernel saved as: linux-5.10-custom
+   ```
+
+2. **During Run**: Use `--kernel-name` flag
+   ```bash
+   imagecracker run --kernel-name linux-5.10-custom myapp
+   ```
+
+### Use Cases
+- **Default naming**: Best for most users, ensures compatibility
+- **Custom naming**: Useful when:
+  - Testing multiple kernel versions
+  - Tracking specific kernel builds
+  - Maintaining kernel version history
 
 ## License
 

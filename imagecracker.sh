@@ -18,6 +18,7 @@ KERNEL_PATH="$DEFAULT_KERNEL"
 COMPRESS=true
 SIZE="$DEFAULT_SIZE"
 WORKING_DIR="."
+KEEP_KERNEL_NAME=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -41,13 +42,13 @@ USAGE:
 COMMANDS:
     build           Build Firecracker image from Dockerfile
     run             Run/test a Firecracker image
-    kill            Kill running Firecracker VMs
     setup           Install symlink for global access
 
 BUILD OPTIONS:
     -n, --name NAME         Image name (required)
     -d, --directory DIR     Output directory (default: $DEFAULT_OUTPUT_DIR)
     -k, --kernel KERNEL     Path to kernel/vmlinux (default: bundled vmlinux)
+    --keep-kernel-name      Keep original kernel filename (default: rename to 'kernel')
     --no-compact            Disable rootfs optimization (keep full size)
     -s, --size SIZE         Initial rootfs size in MB (default: $DEFAULT_SIZE)
     -h, --help              Show this help message
@@ -55,14 +56,11 @@ BUILD OPTIONS:
 RUN OPTIONS:
     -d, --directory DIR     Image directory (default: $DEFAULT_OUTPUT_DIR)
     -c, --config FILE       Use custom Firecracker config file (won't be deleted)
+    --kernel-name NAME      Kernel filename in image directory (default: 'kernel')
     --ram SIZE              RAM size in MB (default: 256, ignored with custom config)
     --vcpus COUNT           Number of vCPUs (default: 2, ignored with custom config)
     --boot-args ARGS        Kernel boot arguments (default: "console=ttyS0 reboot=k panic=1 pci=off", ignored with custom config)
     --executable PATH       Path to firecracker executable (default: firecracker)
-    -h, --help              Show this help message
-
-KILL OPTIONS:
-    -a, --all               Kill all running Firecracker VMs
     -h, --help              Show this help message
 
 EXAMPLES:
@@ -70,8 +68,6 @@ EXAMPLES:
     $(basename "$0") build -n prod /path/to/project          # Build optimized production image
     $(basename "$0") run test                                 # Run image named 'test' from default directory
     $(basename "$0") run -d /my/images test                   # Run image 'test' from custom directory
-    $(basename "$0") kill test                                # Kill VM running image 'test'
-    $(basename "$0") kill --all                               # Kill all running VMs
     $(basename "$0") setup                                    # Install for global access
 
 REQUIREMENTS:
@@ -212,9 +208,6 @@ parse_args() {
         run)
             parse_run_args "$@"
             ;;
-        kill)
-            parse_kill_args "$@"
-            ;;
         setup)
             install_symlink
             ;;
@@ -239,6 +232,7 @@ parse_run_args() {
     local vcpu_count="2"
     local firecracker_exec="firecracker"
     local boot_args="console=ttyS0 reboot=k panic=1 pci=off"
+    local kernel_name="kernel"
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -264,6 +258,10 @@ parse_run_args() {
                 ;;
             --executable)
                 firecracker_exec="$2"
+                shift 2
+                ;;
+            --kernel-name)
+                kernel_name="$2"
                 shift 2
                 ;;
             -h|--help)
@@ -307,56 +305,7 @@ parse_run_args() {
     fi
     
     # Find matching images
-    run_image "$search_dir" "$image_pattern" "$custom_config" "$ram_size" "$vcpu_count" "$firecracker_exec" "$boot_args"
-}
-
-# Parse kill command arguments
-parse_kill_args() {
-    local kill_all=false
-    local image_pattern=""
-    
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -a|--all)
-                kill_all=true
-                shift
-                ;;
-            -h|--help)
-                show_usage
-                exit 0
-                ;;
-            -*)
-                print_error "Unknown option: $1"
-                show_usage
-                exit 1
-                ;;
-            *)
-                if [[ -n "$image_pattern" ]]; then
-                    print_error "Multiple image patterns specified"
-                    show_usage
-                    exit 1
-                fi
-                image_pattern="$1"
-                shift
-                ;;
-        esac
-    done
-    
-    # Validate arguments
-    if [[ "$kill_all" == false ]] && [[ -z "$image_pattern" ]]; then
-        print_error "Image name/pattern or --all flag is required"
-        show_usage
-        exit 1
-    fi
-    
-    if [[ "$kill_all" == true ]] && [[ -n "$image_pattern" ]]; then
-        print_error "Cannot specify both --all and image pattern"
-        show_usage
-        exit 1
-    fi
-    
-    # Kill sessions
-    kill_sessions "$kill_all" "$image_pattern"
+    run_image "$search_dir" "$image_pattern" "$custom_config" "$ram_size" "$vcpu_count" "$firecracker_exec" "$boot_args" "$kernel_name"
 }
 
 # Parse build command arguments
@@ -377,6 +326,10 @@ parse_build_args() {
                 ;;
             --no-compact)
                 COMPRESS=false
+                shift
+                ;;
+            --keep-kernel-name)
+                KEEP_KERNEL_NAME=true
                 shift
                 ;;
             -s|--size)
@@ -476,7 +429,14 @@ build_image() {
     
     # Copy files to target directory
     print_info "Copying files to target directory..."
-    cp "$KERNEL_PATH" "$target_dir/vmlinux"
+    if [[ "$KEEP_KERNEL_NAME" == true ]]; then
+        local kernel_filename=$(basename "$KERNEL_PATH")
+        cp "$KERNEL_PATH" "$target_dir/$kernel_filename"
+        print_info "Kernel saved as: $kernel_filename"
+    else
+        cp "$KERNEL_PATH" "$target_dir/kernel"
+        print_info "Kernel saved as: kernel"
+    fi
     cp "$rootfs_file" "$target_dir/"
     
     # Cleanup
@@ -504,6 +464,7 @@ run_image() {
     local vcpu_count="$5"
     local firecracker_exec="$6"
     local boot_args="$7"
+    local kernel_name="$8"
     
     # Check if search directory exists
     if [[ ! -d "$search_dir" ]]; then
@@ -539,11 +500,12 @@ run_image() {
     local image_name=$(basename "$image_dir")
     
     # Check if required files exist
-    local vmlinux_path="$image_dir/vmlinux"
+    local kernel_path="$image_dir/$kernel_name"
     local rootfs_path="$image_dir/rootfs.ext4"
     
-    if [[ ! -f "$vmlinux_path" ]]; then
-        print_error "Kernel not found: $vmlinux_path"
+    if [[ ! -f "$kernel_path" ]]; then
+        print_error "Kernel not found: $kernel_path"
+        print_info "Use --kernel-name to specify a different kernel filename"
         exit 1
     fi
     
@@ -553,7 +515,7 @@ run_image() {
     fi
     
     print_info "Running image: $image_name"
-    print_info "Kernel: $vmlinux_path"
+    print_info "Kernel: $kernel_path"
     print_info "Rootfs: $rootfs_path"
     
     # Check if firecracker executable exists
@@ -591,7 +553,7 @@ run_image() {
         cat > "$config_file" << EOF
 {
     "boot-source": {
-        "kernel_image_path": "$vmlinux_path",
+        "kernel_image_path": "$kernel_path",
         "boot_args": "$boot_args"
     },
     "drives": [
@@ -620,88 +582,14 @@ EOF
     }
     trap cleanup EXIT
     
-    print_info "Starting Firecracker VM in screen session..."
-    print_info "To detach from screen: Press Ctrl+A then D"
-    print_info "To reattach to screen: screen -r firecracker-$image_name"
-    print_info "To kill the VM: Press Ctrl+A then X (while attached)"
+    print_info "Starting Firecracker VM..."
+    print_info "To exit and terminate VM: Press Ctrl+A then D"
+    print_info "To kill the VM immediately: Press Ctrl+A then X"
     
     # Start Firecracker in screen
     screen -S "firecracker-$image_name" sudo "$firecracker_exec" --api-sock "$socket_path" --config-file "$config_file"
     
     cleanup
-}
-
-# Kill screen sessions
-kill_sessions() {
-    local kill_all="$1"
-    local image_pattern="$2"
-    
-    # Get list of screen sessions
-    local sessions=$(screen -ls | grep -E "firecracker-" | awk '{print $1}')
-    
-    if [[ -z "$sessions" ]]; then
-        print_info "No running Firecracker VMs found"
-        return
-    fi
-    
-    local killed_count=0
-    local matched_sessions=()
-    
-    # Filter sessions based on criteria
-    while IFS= read -r session; do
-        if [[ -z "$session" ]]; then
-            continue
-        fi
-        
-        local session_name=$(echo "$session" | cut -d'.' -f2-)
-        
-        if [[ "$kill_all" == true ]]; then
-            matched_sessions+=("$session")
-        elif [[ "$session_name" == "firecracker-$image_pattern" ]] || [[ "$session_name" == *"firecracker-*$image_pattern"* ]]; then
-            matched_sessions+=("$session")
-        fi
-    done <<< "$sessions"
-    
-    if [[ ${#matched_sessions[@]} -eq 0 ]]; then
-        if [[ "$kill_all" == true ]]; then
-            print_info "No Firecracker VMs to kill"
-        else
-            print_error "No VMs found matching pattern: $image_pattern"
-            print_info "Running VMs:"
-            while IFS= read -r session; do
-                if [[ -n "$session" ]]; then
-                    local name=$(echo "$session" | cut -d'.' -f2- | sed 's/firecracker-//')
-                    echo "  - $name"
-                fi
-            done <<< "$sessions"
-        fi
-        return
-    fi
-    
-    # Kill matched sessions
-    print_info "Killing ${#matched_sessions[@]} VM(s)..."
-    for session in "${matched_sessions[@]}"; do
-        local session_name=$(echo "$session" | cut -d'.' -f2-)
-        local image_name=$(echo "$session_name" | sed 's/firecracker-//')
-        
-        print_info "Killing VM: $image_name"
-        
-        # First try to quit the screen session gracefully
-        screen -S "$session" -X quit 2>/dev/null
-        
-        # If that doesn't work, force kill
-        if screen -ls | grep -q "$session"; then
-            # Get the PID from the session name
-            local pid=$(echo "$session" | cut -d'.' -f1)
-            if [[ -n "$pid" ]]; then
-                sudo kill -9 "$pid" 2>/dev/null || true
-            fi
-        fi
-        
-        ((killed_count++))
-    done
-    
-    print_info "Killed $killed_count VM(s)"
 }
 
 # Main function
