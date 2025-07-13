@@ -19,6 +19,7 @@ COMPRESS=true
 SIZE="$DEFAULT_SIZE"
 WORKING_DIR="."
 KEEP_KERNEL_NAME=false
+CREATE_TEMPLATE=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -50,6 +51,7 @@ BUILD OPTIONS:
     -k, --kernel KERNEL     Path to kernel/vmlinux (default: bundled vmlinux)
     --keep-kernel-name      Keep original kernel filename (default: rename to 'kernel')
     --no-compact            Disable rootfs optimization (keep full size)
+    --templ                 Create vmconfig.json template in output directory
     -s, --size SIZE         Initial rootfs size in MB (default: $DEFAULT_SIZE)
     -h, --help              Show this help message
 
@@ -332,6 +334,10 @@ parse_build_args() {
                 KEEP_KERNEL_NAME=true
                 shift
                 ;;
+            --templ)
+                CREATE_TEMPLATE=true
+                shift
+                ;;
             -s|--size)
                 SIZE="$2"
                 shift 2
@@ -438,6 +444,47 @@ build_image() {
         print_info "Kernel saved as: kernel"
     fi
     cp "$rootfs_file" "$target_dir/"
+    
+    # Create vmconfig.json if --templ flag is set
+    if [[ "$CREATE_TEMPLATE" == true ]]; then
+        print_info "Creating vmconfig.json template..."
+        local kernel_filename="kernel"
+        if [[ "$KEEP_KERNEL_NAME" == true ]]; then
+            kernel_filename=$(basename "$KERNEL_PATH")
+        fi
+        cat > "$target_dir/vmconfig.json" << EOF
+{
+  "boot-source": {
+    "kernel_image_path": "$kernel_filename",
+    "boot_args": "console=ttyS0 reboot=k panic=1 pci=off"
+  },
+  "drives": [
+    {
+      "drive_id": "rootfs",
+      "path_on_host": "rootfs.ext4",
+      "is_root_device": true,
+      "is_read_only": false
+    }
+  ],
+  "machine-config": {
+    "vcpu_count": 2,
+    "mem_size_mib": 512,
+    "ht_enabled": false
+  },
+  "cpu-config": {
+    "max_phys_bits": 39
+  },
+  "network-interfaces": [
+    {
+      "iface_id": "eth0",
+      "guest_mac": "06:00:AC:10:00:02",
+      "host_dev_name": "tap0"
+    }
+  ]
+}
+EOF
+        print_info "vmconfig.json created in $target_dir"
+    fi
     
     # Cleanup
     rm -f "$rootfs_file"

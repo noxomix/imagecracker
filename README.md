@@ -35,6 +35,7 @@ imagecracker <COMMAND> [OPTIONS] [DIRECTORY]
 - `-k, --kernel KERNEL` - Path to vmlinux kernel (default: bundled kernel)
 - `--keep-kernel-name` - Keep original kernel filename (default: rename to 'kernel')
 - `--no-compact` - Disable rootfs optimization (keep full size)
+- `--templ` - Create vmconfig.json template in output directory
 - `-s, --size SIZE` - Initial rootfs size in MB (default: 2048)
 - `-h, --help` - Show help message
 
@@ -81,6 +82,12 @@ imagecracker build --name myapp --kernel /path/to/mykernel-5.10 --keep-kernel-na
 ##### Save to custom directory
 ```bash
 imagecracker build --name testapp --directory /tmp/my-images .
+```
+
+##### Build with VM configuration template
+```bash
+imagecracker build --name myapp --templ .
+# Creates vmconfig.json with default Firecracker configuration
 ```
 
 #### Run Examples
@@ -154,7 +161,8 @@ Images are stored in a structured format:
 $HOME/firecracker_images/
 ├── myapp/
 │   ├── kernel         # Kernel for this VM (default name)
-│   └── rootfs.ext4    # Root filesystem
+│   ├── rootfs.ext4    # Root filesystem
+│   └── vmconfig.json  # VM configuration (if built with --templ)
 ├── production/
 │   ├── kernel
 │   └── rootfs.ext4
@@ -211,6 +219,7 @@ imagecracker run --kernel-name mykernel-5.10 custom-app
 - Images are automatically optimized by default
 - Use `--no-compact` only if you need the full size
 - Use `--keep-kernel-name` to preserve original kernel filenames
+- Use `--templ` to create a ready-to-use Firecracker VM configuration
 
 ### Running
 - Default: 256MB RAM, 2 vCPUs
