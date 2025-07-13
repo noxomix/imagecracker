@@ -37,6 +37,7 @@ imagecracker <COMMAND> [OPTIONS] [DIRECTORY]
 - `--no-compact` - Disable rootfs optimization (keep full size)
 - `--no-template` - Skip creating vmconfig.json template (created by default)
 - `--readonly-rootfs` - Mount rootfs as read-only in VM configuration
+- `--custom-init` - Add init=/init to kernel boot arguments
 - `-ed, --extra-disk [SIZE]` - Create additional empty ext4 disk (default: 4GB, or specify size in GB)
 - `-s, --size SIZE` - Initial rootfs size in MB (default: 2048)
 - `-h, --help` - Show help message
@@ -121,6 +122,12 @@ imagecracker build --name secure-app --readonly-rootfs .
 ```bash
 imagecracker build --name stateful-app --readonly-rootfs --extra-disk 4 .
 # Rootfs is read-only, extra disk for writable data
+```
+
+##### Build with custom init path
+```bash
+imagecracker build --name custom-init-app --custom-init .
+# Adds init=/init to boot arguments for custom init systems
 ```
 
 #### Run Examples

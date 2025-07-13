@@ -22,6 +22,7 @@ KEEP_KERNEL_NAME=false
 CREATE_TEMPLATE=true
 EXTRA_DISK_SIZE=""
 READONLY_ROOTFS=false
+CUSTOM_INIT=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -55,6 +56,7 @@ BUILD OPTIONS:
     --no-compact            Disable rootfs optimization (keep full size)
     --no-template           Skip creating vmconfig.json template (created by default)
     --readonly-rootfs       Mount rootfs as read-only in VM configuration
+    --custom-init           Add init=/init to kernel boot arguments
     -ed, --extra-disk [SIZE] Create additional empty ext4 disk (default: 4GB, or specify size in GB)
     -s, --size SIZE         Initial rootfs size in MB (default: $DEFAULT_SIZE)
     -h, --help              Show this help message
@@ -346,6 +348,10 @@ parse_build_args() {
                 READONLY_ROOTFS=true
                 shift
                 ;;
+            --custom-init)
+                CUSTOM_INIT=true
+                shift
+                ;;
             -ed|--extra-disk)
                 # Check if next argument is a number (disk size)
                 if [[ $# -gt 1 ]] && [[ "$2" =~ ^[0-9]+$ ]]; then
@@ -517,11 +523,17 @@ build_image() {
         drives_json+='
   ]'
         
+        # Generate boot args
+        local boot_args="console=ttyS0 reboot=k panic=1 pci=off"
+        if [[ "$CUSTOM_INIT" == true ]]; then
+            boot_args="$boot_args init=/init"
+        fi
+        
         cat > "$target_dir/vmconfig.json" << EOF
 {
   "boot-source": {
     "kernel_image_path": "$kernel_filename",
-    "boot_args": "console=ttyS0 reboot=k panic=1 pci=off"
+    "boot_args": "$boot_args"
   },
   "drives": $drives_json,
   "machine-config": {
