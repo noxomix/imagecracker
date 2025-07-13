@@ -20,6 +20,7 @@ SIZE="$DEFAULT_SIZE"
 WORKING_DIR="."
 KEEP_KERNEL_NAME=false
 CREATE_TEMPLATE=false
+EXTRA_DISK_SIZE=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -52,6 +53,7 @@ BUILD OPTIONS:
     --keep-kernel-name      Keep original kernel filename (default: rename to 'kernel')
     --no-compact            Disable rootfs optimization (keep full size)
     --templ                 Create vmconfig.json template in output directory
+    -ed, --extra-disk [SIZE] Create additional empty ext4 disk (default: 4GB, or specify size in GB)
     -s, --size SIZE         Initial rootfs size in MB (default: $DEFAULT_SIZE)
     -h, --help              Show this help message
 
@@ -338,6 +340,17 @@ parse_build_args() {
                 CREATE_TEMPLATE=true
                 shift
                 ;;
+            -ed|--extra-disk)
+                # Check if next argument is a number (disk size)
+                if [[ $# -gt 1 ]] && [[ "$2" =~ ^[0-9]+$ ]]; then
+                    EXTRA_DISK_SIZE="$2"
+                    shift 2
+                else
+                    # Default to 4GB if no size specified
+                    EXTRA_DISK_SIZE="4"
+                    shift
+                fi
+                ;;
             -s|--size)
                 SIZE="$2"
                 shift 2
@@ -445,6 +458,25 @@ build_image() {
     fi
     cp "$rootfs_file" "$target_dir/"
     
+    # Create extra disk if --extra-disk flag is set
+    if [[ -n "$EXTRA_DISK_SIZE" ]]; then
+        local extra_disk_file="$target_dir/extra.ext4"
+        local size_mb=$((EXTRA_DISK_SIZE * 1024))
+        
+        print_info "Creating extra disk: ${EXTRA_DISK_SIZE}GB ($extra_disk_file)..."
+        
+        # Create sparse file for extra disk
+        sudo dd if=/dev/zero of="$extra_disk_file" bs=1M count="$size_mb" 2>/dev/null
+        
+        # Create ext4 filesystem
+        sudo mkfs.ext4 -F "$extra_disk_file" >/dev/null 2>&1
+        
+        # Set proper permissions
+        sudo chmod 666 "$extra_disk_file"
+        
+        print_info "Extra disk created: extra.ext4 (${EXTRA_DISK_SIZE}GB)"
+    fi
+    
     # Create vmconfig.json if --templ flag is set
     if [[ "$CREATE_TEMPLATE" == true ]]; then
         print_info "Creating vmconfig.json template..."
@@ -452,20 +484,35 @@ build_image() {
         if [[ "$KEEP_KERNEL_NAME" == true ]]; then
             kernel_filename=$(basename "$KERNEL_PATH")
         fi
+        # Generate drives section based on whether extra disk is present
+        local drives_json='[
+    {
+      "drive_id": "rootfs",
+      "path_on_host": "rootfs.ext4",
+      "is_root_device": true,
+      "is_read_only": false
+    }'
+        
+        if [[ -n "$EXTRA_DISK_SIZE" ]]; then
+            drives_json+=',
+    {
+      "drive_id": "extra",
+      "path_on_host": "extra.ext4",
+      "is_root_device": false,
+      "is_read_only": false
+    }'
+        fi
+        
+        drives_json+='
+  ]'
+        
         cat > "$target_dir/vmconfig.json" << EOF
 {
   "boot-source": {
     "kernel_image_path": "$kernel_filename",
     "boot_args": "console=ttyS0 reboot=k panic=1 pci=off"
   },
-  "drives": [
-    {
-      "drive_id": "rootfs",
-      "path_on_host": "rootfs.ext4",
-      "is_root_device": true,
-      "is_read_only": false
-    }
-  ],
+  "drives": $drives_json,
   "machine-config": {
     "vcpu_count": 2,
     "mem_size_mib": 512,
