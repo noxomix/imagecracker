@@ -696,8 +696,27 @@ EOF
     print_info "To exit and terminate VM: Press Ctrl+A then D"
     print_info "To kill the VM immediately: Press Ctrl+A then X"
     
+    # Create a log file for debugging
+    local log_file="/tmp/firecracker-$image_name-$$.log"
+    
     # Start Firecracker in screen
-    screen -S "firecracker-$image_name" sudo "$firecracker_exec" --api-sock "$socket_path" --config-file "$config_file"
+    # If using image's vmconfig.json, run from image directory for relative paths
+    if [[ "$config_file" == "$image_dir/vmconfig.json" ]]; then
+        (cd "$image_dir" && screen -L -Logfile "$log_file" -S "firecracker-$image_name" sudo "$firecracker_exec" --api-sock "$socket_path" --config-file "$config_file")
+    else
+        screen -L -Logfile "$log_file" -S "firecracker-$image_name" sudo "$firecracker_exec" --api-sock "$socket_path" --config-file "$config_file"
+    fi
+    
+    # Check if screen is still running after a short delay
+    sleep 1
+    if ! screen -list | grep -q "firecracker-$image_name"; then
+        print_error "Firecracker failed to start. Check log at: $log_file"
+        if [[ -f "$log_file" ]]; then
+            print_info "Last 20 lines of log:"
+            tail -20 "$log_file"
+        fi
+        exit 1
+    fi
     
     cleanup
 }
