@@ -36,6 +36,7 @@ imagecracker <COMMAND> [OPTIONS] [DIRECTORY]
 - `--keep-kernel-name` - Keep original kernel filename (default: rename to 'kernel')
 - `--no-compact` - Disable rootfs optimization (keep full size)
 - `--no-template` - Skip creating vmconfig.json template (created by default)
+- `--readonly-rootfs` - Mount rootfs as read-only in VM configuration
 - `-ed, --extra-disk [SIZE]` - Create additional empty ext4 disk (default: 4GB, or specify size in GB)
 - `-s, --size SIZE` - Initial rootfs size in MB (default: 2048)
 - `-h, --help` - Show help message
@@ -108,6 +109,18 @@ imagecracker build --name myapp --extra-disk 16 .
 ```bash
 imagecracker build --name myapp --extra-disk 8 .
 # Creates kernel, rootfs.ext4, extra.ext4 (8GB), and vmconfig.json with both disks configured
+```
+
+##### Build with read-only root filesystem
+```bash
+imagecracker build --name secure-app --readonly-rootfs .
+# Creates VM with rootfs mounted as read-only
+```
+
+##### Build with read-only rootfs and writable extra disk
+```bash
+imagecracker build --name stateful-app --readonly-rootfs --extra-disk 4 .
+# Rootfs is read-only, extra disk for writable data
 ```
 
 #### Run Examples
@@ -243,6 +256,8 @@ imagecracker run --kernel-name mykernel-5.10 custom-app
 - Use `--no-template` if you don't need vmconfig.json
 - Use `--keep-kernel-name` to preserve original kernel filenames
 - Use `--extra-disk` to add a secondary storage disk for data persistence
+- Use `--readonly-rootfs` for secure, immutable root filesystems
+- Combine `--readonly-rootfs` with `--extra-disk` for stateful applications with immutable base
 
 ### Running
 - Default: 256MB RAM, 2 vCPUs

@@ -21,6 +21,7 @@ WORKING_DIR="."
 KEEP_KERNEL_NAME=false
 CREATE_TEMPLATE=true
 EXTRA_DISK_SIZE=""
+READONLY_ROOTFS=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -53,6 +54,7 @@ BUILD OPTIONS:
     --keep-kernel-name      Keep original kernel filename (default: rename to 'kernel')
     --no-compact            Disable rootfs optimization (keep full size)
     --no-template           Skip creating vmconfig.json template (created by default)
+    --readonly-rootfs       Mount rootfs as read-only in VM configuration
     -ed, --extra-disk [SIZE] Create additional empty ext4 disk (default: 4GB, or specify size in GB)
     -s, --size SIZE         Initial rootfs size in MB (default: $DEFAULT_SIZE)
     -h, --help              Show this help message
@@ -340,6 +342,10 @@ parse_build_args() {
                 CREATE_TEMPLATE=false
                 shift
                 ;;
+            --readonly-rootfs)
+                READONLY_ROOTFS=true
+                shift
+                ;;
             -ed|--extra-disk)
                 # Check if next argument is a number (disk size)
                 if [[ $# -gt 1 ]] && [[ "$2" =~ ^[0-9]+$ ]]; then
@@ -485,12 +491,17 @@ build_image() {
             kernel_filename=$(basename "$KERNEL_PATH")
         fi
         # Generate drives section based on whether extra disk is present
+        local rootfs_readonly="false"
+        if [[ "$READONLY_ROOTFS" == true ]]; then
+            rootfs_readonly="true"
+        fi
+        
         local drives_json='[
     {
       "drive_id": "rootfs",
       "path_on_host": "rootfs.ext4",
       "is_root_device": true,
-      "is_read_only": false
+      "is_read_only": '"$rootfs_readonly"'
     }'
         
         if [[ -n "$EXTRA_DISK_SIZE" ]]; then
