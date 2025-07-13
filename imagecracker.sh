@@ -585,12 +585,20 @@ run_image() {
     local config_file=""
     local delete_config=false
     
-    # Use custom config or create default one
+    # Use custom config or check for vmconfig.json in image directory
     if [[ -n "$custom_config" ]]; then
         config_file="$custom_config"
         print_info "Using custom config: $config_file"
         if [[ "$ram_size" != "256" ]] || [[ "$vcpu_count" != "2" ]] || [[ "$boot_args" != "console=ttyS0 reboot=k panic=1 pci=off" ]]; then
             print_warn "--ram, --vcpus, and --boot-args options are ignored when using custom config"
+        fi
+    elif [[ -f "$image_dir/vmconfig.json" ]]; then
+        # Use vmconfig.json from image directory
+        config_file="$image_dir/vmconfig.json"
+        delete_config=false
+        print_info "Using VM config from image: $config_file"
+        if [[ "$ram_size" != "256" ]] || [[ "$vcpu_count" != "2" ]] || [[ "$boot_args" != "console=ttyS0 reboot=k panic=1 pci=off" ]]; then
+            print_warn "--ram, --vcpus, and --boot-args options are ignored when using image's vmconfig.json"
         fi
     else
         config_file="/tmp/firecracker-$$.json"

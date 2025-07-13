@@ -224,9 +224,47 @@ imagecracker run --kernel-name mykernel-5.10 custom-app
 ### Running
 - Default: 256MB RAM, 2 vCPUs
 - Wildcard matching: `imagecracker run web` matches any image containing "web"
-- Custom configs override all other options
+- Configuration priority order:
+  1. `--config` flag (highest priority)
+  2. `vmconfig.json` in image directory (if exists)
+  3. Command-line options like `--ram`, `--vcpus` (lowest priority)
 - Use `--boot-args "console=ttyS0 init=/bin/bash"` for debugging
 - Use `--kernel-name` if kernel has custom name
+
+## VM Configuration
+
+ImageCracker supports multiple ways to configure your Firecracker VMs:
+
+### Configuration Methods (in priority order)
+
+1. **Custom Config File** (`--config`)
+   ```bash
+   imagecracker run --config /path/to/config.json myapp
+   ```
+   - Highest priority - overrides all other options
+   - Full control over Firecracker configuration
+
+2. **Image Config** (`vmconfig.json`)
+   ```bash
+   # Build with --templ to create vmconfig.json
+   imagecracker build --name myapp --templ .
+   # Run uses vmconfig.json automatically
+   imagecracker run myapp
+   ```
+   - Automatically detected in image directory
+   - Created with `--templ` during build
+   - Persists with the image
+
+3. **Command-line Options**
+   ```bash
+   imagecracker run --ram 512 --vcpus 4 myapp
+   ```
+   - Used when no config file exists
+   - Creates temporary configuration
+   - Deleted after VM terminates
+
+### Note on Option Conflicts
+When using `--config` or an image's `vmconfig.json`, command-line options like `--ram`, `--vcpus`, and `--boot-args` are ignored with a warning.
 
 ## Kernel Naming Convention
 
