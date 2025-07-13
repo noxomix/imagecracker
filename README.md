@@ -35,7 +35,7 @@ imagecracker <COMMAND> [OPTIONS] [DIRECTORY]
 - `-k, --kernel KERNEL` - Path to vmlinux kernel (default: bundled kernel)
 - `--keep-kernel-name` - Keep original kernel filename (default: rename to 'kernel')
 - `--no-compact` - Disable rootfs optimization (keep full size)
-- `--templ` - Create vmconfig.json template in output directory
+- `--no-template` - Skip creating vmconfig.json template (created by default)
 - `-ed, --extra-disk [SIZE]` - Create additional empty ext4 disk (default: 4GB, or specify size in GB)
 - `-s, --size SIZE` - Initial rootfs size in MB (default: 2048)
 - `-h, --help` - Show help message
@@ -57,6 +57,7 @@ imagecracker <COMMAND> [OPTIONS] [DIRECTORY]
 ##### Simple build in current directory
 ```bash
 imagecracker build --name myapp .
+# Creates kernel, rootfs.ext4, and vmconfig.json
 ```
 
 ##### Production image (automatically optimized)
@@ -85,10 +86,10 @@ imagecracker build --name myapp --kernel /path/to/mykernel-5.10 --keep-kernel-na
 imagecracker build --name testapp --directory /tmp/my-images .
 ```
 
-##### Build with VM configuration template
+##### Build without VM configuration template
 ```bash
-imagecracker build --name myapp --templ .
-# Creates vmconfig.json with default Firecracker configuration
+imagecracker build --name myapp --no-template .
+# Creates only kernel and rootfs.ext4, no vmconfig.json
 ```
 
 ##### Build with extra disk (default 4GB)
@@ -103,10 +104,10 @@ imagecracker build --name myapp --extra-disk 16 .
 # Creates an additional empty 16GB ext4 disk
 ```
 
-##### Build with template and extra disk
+##### Build with extra disk (8GB)
 ```bash
-imagecracker build --name myapp --templ --extra-disk 8 .
-# Creates vmconfig.json that includes both rootfs.ext4 and extra.ext4 (8GB)
+imagecracker build --name myapp --extra-disk 8 .
+# Creates kernel, rootfs.ext4, extra.ext4 (8GB), and vmconfig.json with both disks configured
 ```
 
 #### Run Examples
@@ -182,7 +183,7 @@ $HOME/firecracker_images/
 │   ├── kernel         # Kernel for this VM (default name)
 │   ├── rootfs.ext4    # Root filesystem
 │   ├── extra.ext4     # Additional disk (if built with --extra-disk)
-│   └── vmconfig.json  # VM configuration (if built with --templ)
+│   └── vmconfig.json  # VM configuration (created by default)
 ├── production/
 │   ├── kernel
 │   └── rootfs.ext4
@@ -237,11 +238,11 @@ imagecracker run --kernel-name mykernel-5.10 custom-app
 
 ### Building
 - Images are automatically optimized by default
+- VM configuration (vmconfig.json) is created by default
 - Use `--no-compact` only if you need the full size
+- Use `--no-template` if you don't need vmconfig.json
 - Use `--keep-kernel-name` to preserve original kernel filenames
-- Use `--templ` to create a ready-to-use Firecracker VM configuration
 - Use `--extra-disk` to add a secondary storage disk for data persistence
-- Combine `--templ` and `--extra-disk` to automatically configure both disks
 
 ### Running
 - Default: 256MB RAM, 2 vCPUs
@@ -268,13 +269,13 @@ ImageCracker supports multiple ways to configure your Firecracker VMs:
 
 2. **Image Config** (`vmconfig.json`)
    ```bash
-   # Build with --templ to create vmconfig.json
-   imagecracker build --name myapp --templ .
+   # Build creates vmconfig.json by default
+   imagecracker build --name myapp .
    # Run uses vmconfig.json automatically
    imagecracker run myapp
    ```
    - Automatically detected in image directory
-   - Created with `--templ` during build
+   - Created by default during build
    - Persists with the image
 
 3. **Command-line Options**

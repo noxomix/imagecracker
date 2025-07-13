@@ -19,7 +19,7 @@ COMPRESS=true
 SIZE="$DEFAULT_SIZE"
 WORKING_DIR="."
 KEEP_KERNEL_NAME=false
-CREATE_TEMPLATE=false
+CREATE_TEMPLATE=true
 EXTRA_DISK_SIZE=""
 
 # Colors for output
@@ -52,7 +52,7 @@ BUILD OPTIONS:
     -k, --kernel KERNEL     Path to kernel/vmlinux (default: bundled vmlinux)
     --keep-kernel-name      Keep original kernel filename (default: rename to 'kernel')
     --no-compact            Disable rootfs optimization (keep full size)
-    --templ                 Create vmconfig.json template in output directory
+    --no-template           Skip creating vmconfig.json template (created by default)
     -ed, --extra-disk [SIZE] Create additional empty ext4 disk (default: 4GB, or specify size in GB)
     -s, --size SIZE         Initial rootfs size in MB (default: $DEFAULT_SIZE)
     -h, --help              Show this help message
@@ -336,8 +336,8 @@ parse_build_args() {
                 KEEP_KERNEL_NAME=true
                 shift
                 ;;
-            --templ)
-                CREATE_TEMPLATE=true
+            --no-template)
+                CREATE_TEMPLATE=false
                 shift
                 ;;
             -ed|--extra-disk)
