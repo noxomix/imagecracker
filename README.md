@@ -1,16 +1,13 @@
-# ImageCracker - Universal Firecracker Image Builder
+# ImageCracker
 
-A universal CLI tool for creating Firecracker VM images from any directory with a Dockerfile.
+Convert Dockerfiles to Firecracker VM images.
 
 ## Features
 
-- **Universal**: Works with any directory containing a Dockerfile
-- **Automatic Optimization**: Shrinks images to actual required size by default
-- **Flexible**: Customizable parameters for different use cases
-- **Globally Available**: Symlink installation for system-wide access
-- **User-specific**: Images are stored in the user's home directory
-- **Interactive**: Direct console access to VMs
-- **Kernel Flexibility**: Support for custom kernel names and preservation
+- Build VM images from any Dockerfile
+- Automatic image size optimization
+- Direct console access
+- Custom kernel support
 
 ## Installation
 
