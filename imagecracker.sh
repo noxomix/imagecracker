@@ -40,6 +40,8 @@ USAGE:
 
 COMMANDS:
     build           Build Firecracker image from Dockerfile
+    run             Run/test a Firecracker image
+    kill            Kill running Firecracker VMs
     setup           Install symlink for global access
 
 BUILD OPTIONS:
@@ -50,9 +52,26 @@ BUILD OPTIONS:
     -s, --size SIZE         Initial rootfs size in MB (default: $DEFAULT_SIZE)
     -h, --help              Show this help message
 
+RUN OPTIONS:
+    -d, --directory DIR     Image directory (default: $DEFAULT_OUTPUT_DIR)
+    -c, --config FILE       Use custom Firecracker config file (won't be deleted)
+    --ram SIZE              RAM size in MB (default: 256, ignored with custom config)
+    --vcpus COUNT           Number of vCPUs (default: 2, ignored with custom config)
+    --boot-args ARGS        Kernel boot arguments (default: "console=ttyS0 reboot=k panic=1 pci=off", ignored with custom config)
+    --executable PATH       Path to firecracker executable (default: firecracker)
+    -h, --help              Show this help message
+
+KILL OPTIONS:
+    -a, --all               Kill all running Firecracker VMs
+    -h, --help              Show this help message
+
 EXAMPLES:
     $(basename "$0") build --name myapp .                     # Build image from current directory
     $(basename "$0") build -n prod /path/to/project          # Build optimized production image
+    $(basename "$0") run test                                 # Run image named 'test' from default directory
+    $(basename "$0") run -d /my/images test                   # Run image 'test' from custom directory
+    $(basename "$0") kill test                                # Kill VM running image 'test'
+    $(basename "$0") kill --all                               # Kill all running VMs
     $(basename "$0") setup                                    # Install for global access
 
 REQUIREMENTS:
@@ -69,6 +88,42 @@ install_symlink() {
     local symlink_name="imagecracker"
     local shell_rc=""
     local bin_dir="$SCRIPT_DIR/bin"
+    
+    # Check if screen is installed, offer to install if not
+    if ! command -v screen &> /dev/null; then
+        print_warn "Screen is not installed. Screen is recommended for running VMs in the background."
+        read -p "Would you like to install screen now? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Installing screen..."
+            if command -v apt-get &> /dev/null; then
+                sudo apt-get update && sudo apt-get install -y screen
+            elif command -v yum &> /dev/null; then
+                sudo yum install -y screen
+            elif command -v dnf &> /dev/null; then
+                sudo dnf install -y screen
+            elif command -v zypper &> /dev/null; then
+                sudo zypper install -y screen
+            elif command -v pacman &> /dev/null; then
+                sudo pacman -S --noconfirm screen
+            else
+                print_error "Could not detect package manager. Please install screen manually."
+            fi
+            
+            if command -v screen &> /dev/null; then
+                print_info "Screen installed successfully!"
+            else
+                print_warn "Screen installation failed. Please install it manually."
+            fi
+        else
+            print_info "Skipping screen installation. You can install it later with:"
+            print_info "  Debian/Ubuntu: sudo apt-get install screen"
+            print_info "  RHEL/CentOS: sudo yum install screen"
+            print_info "  Fedora: sudo dnf install screen"
+            print_info "  openSUSE: sudo zypper install screen"
+            print_info "  Arch: sudo pacman -S screen"
+        fi
+    fi
     
     # Detect shell and RC file
     if [[ -n "$ZSH_VERSION" ]] || [[ "$SHELL" =~ zsh ]]; then
@@ -154,6 +209,12 @@ parse_args() {
         build)
             parse_build_args "$@"
             ;;
+        run)
+            parse_run_args "$@"
+            ;;
+        kill)
+            parse_kill_args "$@"
+            ;;
         setup)
             install_symlink
             ;;
@@ -167,6 +228,135 @@ parse_args() {
             exit 1
             ;;
     esac
+}
+
+# Parse run command arguments
+parse_run_args() {
+    local search_dir="$DEFAULT_OUTPUT_DIR"
+    local image_pattern=""
+    local custom_config=""
+    local ram_size="256"
+    local vcpu_count="2"
+    local firecracker_exec="firecracker"
+    local boot_args="console=ttyS0 reboot=k panic=1 pci=off"
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -d|--directory)
+                search_dir="$2"
+                shift 2
+                ;;
+            -c|--config)
+                custom_config="$2"
+                shift 2
+                ;;
+            --ram)
+                ram_size="$2"
+                shift 2
+                ;;
+            --vcpus)
+                vcpu_count="$2"
+                shift 2
+                ;;
+            --boot-args)
+                boot_args="$2"
+                shift 2
+                ;;
+            --executable)
+                firecracker_exec="$2"
+                shift 2
+                ;;
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            -*)
+                print_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+            *)
+                image_pattern="$1"
+                shift
+                ;;
+        esac
+    done
+    
+    # Validate required arguments
+    if [[ -z "$image_pattern" ]]; then
+        print_error "Image name/pattern is required"
+        show_usage
+        exit 1
+    fi
+    
+    # Validate custom config if provided
+    if [[ -n "$custom_config" ]] && [[ ! -f "$custom_config" ]]; then
+        print_error "Config file not found: $custom_config"
+        exit 1
+    fi
+    
+    # Validate RAM and vCPU values
+    if ! [[ "$ram_size" =~ ^[0-9]+$ ]] || [[ "$ram_size" -lt 128 ]]; then
+        print_error "Invalid RAM size: $ram_size (must be at least 128 MB)"
+        exit 1
+    fi
+    
+    if ! [[ "$vcpu_count" =~ ^[0-9]+$ ]] || [[ "$vcpu_count" -lt 1 ]] || [[ "$vcpu_count" -gt 32 ]]; then
+        print_error "Invalid vCPU count: $vcpu_count (must be between 1 and 32)"
+        exit 1
+    fi
+    
+    # Find matching images
+    run_image "$search_dir" "$image_pattern" "$custom_config" "$ram_size" "$vcpu_count" "$firecracker_exec" "$boot_args"
+}
+
+# Parse kill command arguments
+parse_kill_args() {
+    local kill_all=false
+    local image_pattern=""
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -a|--all)
+                kill_all=true
+                shift
+                ;;
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            -*)
+                print_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+            *)
+                if [[ -n "$image_pattern" ]]; then
+                    print_error "Multiple image patterns specified"
+                    show_usage
+                    exit 1
+                fi
+                image_pattern="$1"
+                shift
+                ;;
+        esac
+    done
+    
+    # Validate arguments
+    if [[ "$kill_all" == false ]] && [[ -z "$image_pattern" ]]; then
+        print_error "Image name/pattern or --all flag is required"
+        show_usage
+        exit 1
+    fi
+    
+    if [[ "$kill_all" == true ]] && [[ -n "$image_pattern" ]]; then
+        print_error "Cannot specify both --all and image pattern"
+        show_usage
+        exit 1
+    fi
+    
+    # Kill sessions
+    kill_sessions "$kill_all" "$image_pattern"
 }
 
 # Parse build command arguments
@@ -305,11 +495,222 @@ build_image() {
     fi
 }
 
+# Run a Firecracker image
+run_image() {
+    local search_dir="$1"
+    local image_pattern="$2"
+    local custom_config="$3"
+    local ram_size="$4"
+    local vcpu_count="$5"
+    local firecracker_exec="$6"
+    local boot_args="$7"
+    
+    # Check if search directory exists
+    if [[ ! -d "$search_dir" ]]; then
+        print_error "Directory not found: $search_dir"
+        exit 1
+    fi
+    
+    # Find matching image directories
+    local matches=()
+    while IFS= read -r -d '' dir; do
+        local basename=$(basename "$dir")
+        if [[ "$basename" == *"$image_pattern"* ]]; then
+            matches+=("$dir")
+        fi
+    done < <(find "$search_dir" -maxdepth 1 -type d -name "*$image_pattern*" -print0)
+    
+    # Check number of matches
+    if [[ ${#matches[@]} -eq 0 ]]; then
+        print_error "No images found matching pattern: $image_pattern"
+        print_info "Available images in $search_dir:"
+        find "$search_dir" -maxdepth 1 -type d -not -path "$search_dir" -exec basename {} \; | sort
+        exit 1
+    elif [[ ${#matches[@]} -gt 1 ]]; then
+        print_error "Multiple images found matching pattern: $image_pattern"
+        print_info "Matching images:"
+        for match in "${matches[@]}"; do
+            echo "  - $(basename "$match")"
+        done
+        exit 1
+    fi
+    
+    local image_dir="${matches[0]}"
+    local image_name=$(basename "$image_dir")
+    
+    # Check if required files exist
+    local vmlinux_path="$image_dir/vmlinux"
+    local rootfs_path="$image_dir/rootfs.ext4"
+    
+    if [[ ! -f "$vmlinux_path" ]]; then
+        print_error "Kernel not found: $vmlinux_path"
+        exit 1
+    fi
+    
+    if [[ ! -f "$rootfs_path" ]]; then
+        print_error "Root filesystem not found: $rootfs_path"
+        exit 1
+    fi
+    
+    print_info "Running image: $image_name"
+    print_info "Kernel: $vmlinux_path"
+    print_info "Rootfs: $rootfs_path"
+    
+    # Check if firecracker executable exists
+    if ! command -v "$firecracker_exec" &> /dev/null; then
+        print_error "Firecracker executable not found: $firecracker_exec"
+        print_info "Please install Firecracker or specify correct path with --executable"
+        print_info "Installation guide: https://github.com/firecracker-microvm/firecracker"
+        exit 1
+    fi
+    
+    # Check if screen is installed
+    if ! command -v screen &> /dev/null; then
+        print_error "Screen is not installed. Screen is required to run VMs in the background."
+        print_info "Install screen with: sudo apt-get install screen (Debian/Ubuntu) or sudo yum install screen (RHEL/CentOS)"
+        exit 1
+    fi
+    
+    # Create temporary socket
+    local socket_path="/tmp/firecracker-$$.socket"
+    local config_file=""
+    local delete_config=false
+    
+    # Use custom config or create default one
+    if [[ -n "$custom_config" ]]; then
+        config_file="$custom_config"
+        print_info "Using custom config: $config_file"
+        if [[ "$ram_size" != "256" ]] || [[ "$vcpu_count" != "2" ]] || [[ "$boot_args" != "console=ttyS0 reboot=k panic=1 pci=off" ]]; then
+            print_warn "--ram, --vcpus, and --boot-args options are ignored when using custom config"
+        fi
+    else
+        config_file="/tmp/firecracker-$$.json"
+        delete_config=true
+        
+        # Create default Firecracker configuration
+        cat > "$config_file" << EOF
+{
+    "boot-source": {
+        "kernel_image_path": "$vmlinux_path",
+        "boot_args": "$boot_args"
+    },
+    "drives": [
+        {
+            "drive_id": "rootfs",
+            "path_on_host": "$rootfs_path",
+            "is_root_device": true,
+            "is_read_only": false
+        }
+    ],
+    "machine-config": {
+        "vcpu_count": $vcpu_count,
+        "mem_size_mib": $ram_size
+    }
+}
+EOF
+    fi
+    
+    # Cleanup function
+    cleanup() {
+        rm -f "$socket_path"
+        if [[ "$delete_config" == true ]]; then
+            rm -f "$config_file"
+        fi
+        pkill -f "firecracker.*$socket_path" 2>/dev/null || true
+    }
+    trap cleanup EXIT
+    
+    print_info "Starting Firecracker VM in screen session..."
+    print_info "To detach from screen: Press Ctrl+A then D"
+    print_info "To reattach to screen: screen -r firecracker-$image_name"
+    print_info "To kill the VM: Press Ctrl+A then X (while attached)"
+    
+    # Start Firecracker in screen
+    screen -S "firecracker-$image_name" sudo "$firecracker_exec" --api-sock "$socket_path" --config-file "$config_file"
+    
+    cleanup
+}
+
+# Kill screen sessions
+kill_sessions() {
+    local kill_all="$1"
+    local image_pattern="$2"
+    
+    # Get list of screen sessions
+    local sessions=$(screen -ls | grep -E "firecracker-" | awk '{print $1}')
+    
+    if [[ -z "$sessions" ]]; then
+        print_info "No running Firecracker VMs found"
+        return
+    fi
+    
+    local killed_count=0
+    local matched_sessions=()
+    
+    # Filter sessions based on criteria
+    while IFS= read -r session; do
+        if [[ -z "$session" ]]; then
+            continue
+        fi
+        
+        local session_name=$(echo "$session" | cut -d'.' -f2-)
+        
+        if [[ "$kill_all" == true ]]; then
+            matched_sessions+=("$session")
+        elif [[ "$session_name" == "firecracker-$image_pattern" ]] || [[ "$session_name" == *"firecracker-*$image_pattern"* ]]; then
+            matched_sessions+=("$session")
+        fi
+    done <<< "$sessions"
+    
+    if [[ ${#matched_sessions[@]} -eq 0 ]]; then
+        if [[ "$kill_all" == true ]]; then
+            print_info "No Firecracker VMs to kill"
+        else
+            print_error "No VMs found matching pattern: $image_pattern"
+            print_info "Running VMs:"
+            while IFS= read -r session; do
+                if [[ -n "$session" ]]; then
+                    local name=$(echo "$session" | cut -d'.' -f2- | sed 's/firecracker-//')
+                    echo "  - $name"
+                fi
+            done <<< "$sessions"
+        fi
+        return
+    fi
+    
+    # Kill matched sessions
+    print_info "Killing ${#matched_sessions[@]} VM(s)..."
+    for session in "${matched_sessions[@]}"; do
+        local session_name=$(echo "$session" | cut -d'.' -f2-)
+        local image_name=$(echo "$session_name" | sed 's/firecracker-//')
+        
+        print_info "Killing VM: $image_name"
+        
+        # First try to quit the screen session gracefully
+        screen -S "$session" -X quit 2>/dev/null
+        
+        # If that doesn't work, force kill
+        if screen -ls | grep -q "$session"; then
+            # Get the PID from the session name
+            local pid=$(echo "$session" | cut -d'.' -f1)
+            if [[ -n "$pid" ]]; then
+                sudo kill -9 "$pid" 2>/dev/null || true
+            fi
+        fi
+        
+        ((killed_count++))
+    done
+    
+    print_info "Killed $killed_count VM(s)"
+}
+
 # Main function
 main() {
     parse_args "$@"
-    validate_requirements
-    build_image
+    if [[ "$1" == "build" ]]; then
+        validate_requirements
+        build_image
+    fi
 }
 
 # Run main function
