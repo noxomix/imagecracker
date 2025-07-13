@@ -251,11 +251,6 @@ If you need to preserve original kernel filenames (e.g., for version tracking):
   - Tracking specific kernel builds
   - Maintaining kernel version history
 
-## License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE.md](LICENSE.md) file for details.
-
-The included Linux kernel (`vmlinux`) is licensed under GPLv2 - see [KERNEL_LICENSE.md](KERNEL_LICENSE.md) for details.
 
 ## Firecracker-Compatible Dockerfile Examples
 
@@ -316,3 +311,9 @@ ENTRYPOINT ["/sbin/init"]
 - **PID 1**: Must use `/sbin/init` as entrypoint, not your application
 - **Full VM Environment**: Include networking tools, SSH server, etc.
 - **Hostname Configuration**: Set hostname for the VM
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE.md](LICENSE.md) file for details.
+
+The included Linux kernel (`vmlinux`) is licensed under GPLv2 - see [KERNEL_LICENSE.md](KERNEL_LICENSE.md) for details.
