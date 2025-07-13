@@ -574,11 +574,11 @@ EOF
     
     # Cleanup function
     cleanup() {
-        rm -f "$socket_path"
+        sudo rm -f "$socket_path" 2>/dev/null || true
         if [[ "$delete_config" == true ]]; then
             rm -f "$config_file"
         fi
-        pkill -f "firecracker.*$socket_path" 2>/dev/null || true
+        sudo pkill -f "firecracker.*$socket_path" 2>/dev/null || true
     }
     trap cleanup EXIT
     

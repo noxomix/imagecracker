@@ -14,14 +14,11 @@ A universal CLI tool for creating Firecracker VM images from any directory with 
 
 ## Installation
 
-### Install symlink for global access
 ```bash
 git clone https://github.com/noxomix/imagecracker.git
 cd imagecracker
 ./imagecracker.sh setup
 ```
-
-After installation, you can use `imagecracker` from anywhere!
 
 ## Usage
 
@@ -150,7 +147,7 @@ imagecracker setup
 - Pre-built Firecracker images (created with the `build` command)
 - Screen installed (for VM console management)
 
-**Important**: Firecracker VMs require special Dockerfile configurations with init systems (systemd/OpenRC) since they run full VMs, not containers. Your Dockerfile must use `/sbin/init` as entrypoint and include essential system packages.
+**Important**: Firecracker requires init systems (systemd/OpenRC) - see [Dockerfile Examples](#firecracker-compatible-dockerfile-examples)
 
 ## Output Structure
 
@@ -170,21 +167,20 @@ $HOME/firecracker_images/
 └── ...
 ```
 
-**Note**: By default, all kernels are saved as `kernel` for consistency. Use `--keep-kernel-name` during build to preserve the original kernel filename.
 
 ## Workflow
 
 ### Building Images
-1. **Preparation**: Navigate to a directory with a Dockerfile
-2. **Build**: Run `imagecracker build --name <name> .`
-3. **Storage**: The finished images are located in `$HOME/firecracker_images/<name>/`
+1. Navigate to a directory with a Dockerfile
+2. Run `imagecracker build --name <name> .`
+3. Images are stored in `$HOME/firecracker_images/<name>/`
 
 ### Running Images
-1. **Test**: Run `imagecracker run <name>` to start and connect to the VM
-2. **Interact**: Use the console:
+1. Run `imagecracker run <name>` to start and connect to the VM
+2. Use the console:
    - Press Ctrl+A then D to exit and terminate the VM
    - Press Ctrl+A then X to kill the VM immediately
-3. **Configure**: Use options like `--ram`, `--vcpus`, `--boot-args` for customization
+3. Configure with options like `--ram`, `--vcpus`, `--boot-args`
 
 ### Complete Example
 ```bash
@@ -215,31 +211,23 @@ imagecracker run --kernel-name mykernel-5.10 custom-app
 ## Tips
 
 ### Building
-- Use descriptive names for your images (`--name dev`, `--name prod`, etc.)
-- Images are automatically optimized (shrunk to actual size) by default
+- Images are automatically optimized by default
 - Use `--no-compact` only if you need the full size
-- The included kernel works with most applications
-- Images are automatically overwritten if you use the same name
-- Kernels are saved as 'kernel' by default for compatibility
 - Use `--keep-kernel-name` to preserve original kernel filenames
 
 ### Running
-- Start with default settings (256MB RAM, 2 vCPUs) and increase as needed
-- Use wildcard matching: `imagecracker run web` matches any image containing "web"
-- Custom configs override all other options (`--ram`, `--vcpus`, `--boot-args`)
-- VM controls:
-  - Ctrl+A then D: Exit and terminate VM
-  - Ctrl+A then X: Kill VM immediately
-- Use `--boot-args "console=ttyS0 init=/bin/bash"` for debugging boot issues
-- Default kernel filename is 'kernel', use `--kernel-name` if different
+- Default: 256MB RAM, 2 vCPUs
+- Wildcard matching: `imagecracker run web` matches any image containing "web"
+- Custom configs override all other options
+- Use `--boot-args "console=ttyS0 init=/bin/bash"` for debugging
+- Use `--kernel-name` if kernel has custom name
 
 ## Kernel Naming Convention
 
 ImageCracker provides flexible kernel naming to support different use cases:
 
 ### Default Behavior
-- All kernels are saved as `kernel` in the image directory
-- This ensures compatibility and consistency across images
+- Kernels are saved as `kernel` in the image directory
 - The `run` command expects `kernel` by default
 
 ### Custom Kernel Names
