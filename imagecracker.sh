@@ -526,19 +526,8 @@ build_image() {
   "drives": $drives_json,
   "machine-config": {
     "vcpu_count": 2,
-    "mem_size_mib": 512,
-    "ht_enabled": false
-  },
-  "cpu-config": {
-    "max_phys_bits": 39
-  },
-  "network-interfaces": [
-    {
-      "iface_id": "eth0",
-      "guest_mac": "06:00:AC:10:00:02",
-      "host_dev_name": "tap0"
-    }
-  ]
+    "mem_size_mib": 512
+  }
 }
 EOF
         print_info "vmconfig.json created in $target_dir"
