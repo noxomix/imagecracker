@@ -577,31 +577,39 @@ run_image() {
         exit 1
     fi
     
-    # Find matching image directories
-    local matches=()
-    while IFS= read -r -d '' dir; do
-        local basename=$(basename "$dir")
-        if [[ "$basename" == *"$image_pattern"* ]]; then
-            matches+=("$dir")
+    # First, check for exact match
+    local exact_match="$search_dir/$image_pattern"
+    if [[ -d "$exact_match" ]]; then
+        local image_dir="$exact_match"
+    else
+        # If no exact match, find partial matches
+        local matches=()
+        while IFS= read -r -d '' dir; do
+            local basename=$(basename "$dir")
+            if [[ "$basename" == *"$image_pattern"* ]]; then
+                matches+=("$dir")
+            fi
+        done < <(find "$search_dir" -maxdepth 1 -type d -name "*$image_pattern*" -print0)
+        
+        # Check number of matches
+        if [[ ${#matches[@]} -eq 0 ]]; then
+            print_error "No images found matching pattern: $image_pattern"
+            print_info "Available images in $search_dir:"
+            find "$search_dir" -maxdepth 1 -type d -not -path "$search_dir" -exec basename {} \; | sort
+            exit 1
+        elif [[ ${#matches[@]} -gt 1 ]]; then
+            print_error "Multiple images found matching pattern: $image_pattern"
+            print_info "Matching images:"
+            for match in "${matches[@]}"; do
+                echo "  - $(basename "$match")"
+            done
+            print_info "Tip: Use exact image name to avoid ambiguity"
+            exit 1
         fi
-    done < <(find "$search_dir" -maxdepth 1 -type d -name "*$image_pattern*" -print0)
-    
-    # Check number of matches
-    if [[ ${#matches[@]} -eq 0 ]]; then
-        print_error "No images found matching pattern: $image_pattern"
-        print_info "Available images in $search_dir:"
-        find "$search_dir" -maxdepth 1 -type d -not -path "$search_dir" -exec basename {} \; | sort
-        exit 1
-    elif [[ ${#matches[@]} -gt 1 ]]; then
-        print_error "Multiple images found matching pattern: $image_pattern"
-        print_info "Matching images:"
-        for match in "${matches[@]}"; do
-            echo "  - $(basename "$match")"
-        done
-        exit 1
+        
+        local image_dir="${matches[0]}"
     fi
     
-    local image_dir="${matches[0]}"
     local image_name=$(basename "$image_dir")
     
     # Check if required files exist
