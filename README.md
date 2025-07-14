@@ -31,7 +31,7 @@ imagecracker <COMMAND> [OPTIONS] [DIRECTORY]
 
 ### Build Options
 - `-n, --name NAME` - Image name (required)
-- `-d, --directory DIR` - Output directory (default: `$HOME/firecracker_images`)
+- `-d, --directory DIR` - Output directory (default: `$HOME/firebuilds`)
 - `-k, --kernel KERNEL` - Path to vmlinux kernel (default: bundled kernel)
 - `--keep-kernel-name` - Keep original kernel filename (default: rename to 'kernel')
 - `--no-compact` - Disable rootfs optimization (keep full size)
@@ -43,7 +43,7 @@ imagecracker <COMMAND> [OPTIONS] [DIRECTORY]
 - `-h, --help` - Show help message
 
 ### Run Options
-- `-d, --directory DIR` - Image directory (default: `$HOME/firecracker_images`)
+- `-d, --directory DIR` - Image directory (default: `$HOME/firebuilds`)
 - `-c, --config FILE` - Use custom Firecracker config file (won't be deleted)
 - `--kernel-name NAME` - Kernel filename in image directory (default: 'kernel')
 - `--ram SIZE` - RAM size in MB (default: 256, ignored with custom config)
@@ -198,7 +198,7 @@ imagecracker setup
 Images are stored in a structured format:
 
 ```
-$HOME/firecracker_images/
+$HOME/firebuilds/
 ├── myapp/
 │   ├── kernel         # Kernel for this VM (default name)
 │   ├── rootfs.ext4    # Root filesystem
@@ -219,7 +219,7 @@ $HOME/firecracker_images/
 ### Building Images
 1. Navigate to a directory with a Dockerfile
 2. Run `imagecracker build --name <name> .`
-3. Images are stored in `$HOME/firecracker_images/<name>/`
+3. Images are stored in `$HOME/firebuilds/<name>/`
 
 ### Running Images
 1. Run `imagecracker run <name>` to start and connect to the VM

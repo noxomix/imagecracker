@@ -8,7 +8,7 @@ set -e
 # Script directory and default paths
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 DEFAULT_KERNEL="$SCRIPT_DIR/vmlinux"
-DEFAULT_OUTPUT_DIR="$HOME/firecracker_images"
+DEFAULT_OUTPUT_DIR="$HOME/firebuilds"
 DEFAULT_SIZE="2048"
 
 # Default values
@@ -139,7 +139,7 @@ install_symlink() {
         shell_rc="$HOME/.bashrc"
     fi
     
-    # Create default firecracker_images directory
+    # Create default firebuilds directory
     print_info "Creating default output directory: $DEFAULT_OUTPUT_DIR"
     mkdir -p "$DEFAULT_OUTPUT_DIR"
     
