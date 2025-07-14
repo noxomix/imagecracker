@@ -449,7 +449,7 @@ build_image() {
         
         local min_blocks=$(sudo resize2fs -P "$rootfs_file" 2>/dev/null | grep -oE '[0-9]+' | tail -1)
         local block_size=$(sudo dumpe2fs -h "$rootfs_file" 2>/dev/null | grep "Block size" | awk '{print $3}')
-        local min_size_mb=$(( (min_blocks * block_size / 1024 / 1024) + 20 ))  # 20MB buffer
+        local min_size_mb=$(( (min_blocks * block_size / 1024 / 1024) + 4 ))  # 4MB buffer
         
         print_info "Shrinking to ${min_size_mb}MB..."
         sudo resize2fs -p "$rootfs_file" ${min_size_mb}M >/dev/null 2>&1
